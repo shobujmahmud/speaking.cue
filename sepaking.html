@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IELTS Cue Card Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application uses a dashboard and filterable-list structure. The top section provides a visual overview (a doughnut chart) of the question distribution by category. Below this, a primary navigation bar with buttons allows users to filter the list of questions. Each question is presented as a card in a responsive grid. A search bar provides secondary, text-based filtering. This structure was chosen for its intuitiveness; users get an immediate summary and can then drill down into specific categories or search for keywords, making it an efficient tool for targeted practice. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Counts of questions per category. Goal: Inform/Compare. Viz: Doughnut Chart. Interaction: Hover for tooltips showing exact counts. Justification: Provides a quick, scannable overview of the topic balance. Library: Chart.js (Canvas).
+        - Report Info: Full list of cue card questions. Goal: Organize/Explore. Presentation: HTML/Tailwind CSS Cards. Interaction: Filtering via category buttons and a search bar. Justification: Cards are easy to read, and filtering is the most direct way for users to navigate to the content they need. Method: Vanilla JS DOM manipulation.
+        - All content is organized under clear headings and introductory text to guide the user. The interactive elements directly serve the goal of making a large list of text-based data easily explorable.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .filter-btn.active {
+            background-color: #4338ca;
+            color: #ffffff;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-indigo-700">IELTS Cue Card Explorer</h1>
+            <p class="mt-2 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">An interactive tool to explore and practice speaking test questions, categorized for your convenience.</p>
+        </header>
+
+        <main>
+            <section id="overview" class="mb-10 p-4 sm:p-6 bg-white rounded-xl shadow-md">
+                 <h2 class="text-2xl font-semibold text-center mb-4">Question Distribution</h2>
+                 <p class="text-center text-slate-500 mb-6">This chart shows the number of cue card questions available in each category. Hover over a segment to see the exact count. Use the filters below to explore the questions.</p>
+                <div class="chart-container relative w-full max-w-md mx-auto min-h-[250px]">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </section>
+            
+            <section id="explorer" class="p-4 sm:p-6 bg-white rounded-xl shadow-md">
+                <h2 class="text-2xl font-semibold text-center mb-6">Explore Questions</h2>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
+                    <div class="relative flex-grow">
+                         <input type="text" id="search-input" placeholder="Search questions..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                         </div>
+                    </div>
+                </div>
+
+                <div id="filter-buttons" class="flex flex-wrap justify-center gap-2 mb-8">
+                    <button class="filter-btn active px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="All">All</button>
+                    <button class="filter-btn px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="People">People</button>
+                    <button class="filter-btn px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="Place">Place</button>
+                    <button class="filter-btn px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="Events">Events</button>
+                    <button class="filter-btn px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="Things">Things</button>
+                    <button class="filter-btn px-4 py-2 bg-slate-200 text-slate-700 rounded-lg transition hover:bg-indigo-500 hover:text-white" data-filter="Activities">Activities</button>
+                </div>
+    
+                <div id="questions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+                 <div id="no-results" class="text-center py-10 text-slate-500 hidden">
+                    <p class="text-lg">No questions found matching your criteria.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const questions = [
+                { number: 2, question: "Describe a successful sportsperson you admire.", category: "People" },
+                { number: 14, question: "Describe a singer whose music/songs you like.", category: "People" },
+                { number: 20, question: "Describe a friend of yours who is good at music/singing.", category: "People" },
+                { number: 27, question: "Describe a person who you think wears unusual clothes.", category: "People" },
+                { number: 33, question: "Describe a person from a different cultural background with whom you enjoy spending time.", category: "People" },
+                { number: 40, question: "Describe a person you have met who you want to work/study with.", category: "People" },
+                { number: 45, question: "Describe a famous person you would like to meet.", category: "People" },
+                { number: 46, question: "Describe an intelligent person you know.", category: "People" },
+                { number: 56, question: "Describe a person who inspired you to do something interesting.", category: "People" },
+                { number: 59, question: "Describe a person who persuaded you to do something.", category: "People" },
+                { number: 60, question: "Describe a person who likes to grow plants.", category: "People" },
+                { number: 63, question: "Describe a person who shows his/her feelings very openly.", category: "People" },
+                { number: 76, question: "Describe a person who helps to protect the environment.", category: "People" },
+                { number: 84, question: "Describe a person you disliked at first but ended up being friends with.", category: "People" },
+                { number: 85, question: "Describe a friend of yours who is well dressed and is good at dressing up.", category: "People" },
+                { number: 95, question: "Describe a person who contributes to the society.", category: "People" },
+                { number: 96, question: "Describe an energetic person that you know.", category: "People" },
+                { number: 106, question: "Describe a friend you like to talk with.", category: "People" },
+                { number: 110, question: "Describe a family member who you want to work with in the future.", category: "People" },
+                { number: 112, question: "Describe someone you really like to spend time with.", category: "People" },
+                { number: 118, question: "Describe an old person you know who has had an interesting life.", category: "People" },
+                { number: 54, question: "Describe a friend from your childhood.", category: "People" },
+                { number: 13, question: "Describe someone else’s room you enjoy spending time in.", category: "Place" },
+                { number: 23, question: "Describe a place in your country or part of your country that you would like to recommend to visitors/travelers.", category: "Place" },
+                { number: 28, question: "Describe your favorite place in your house where you can relax.", category: "Place" },
+                { number: 29, question: "Describe a popular place for sports (e.g. a stadium) that you’ve been to.", category: "Place" },
+                { number: 31, question: "Describe a city you have been to and would like to visit again.", category: "Place" },
+                { number: 34, question: "Describe a website you often visit.", category: "Place" },
+                { number: 37, question: "Describe a website that sells second-hand items.", category: "Place" },
+                { number: 62, question: "Describe an unusual but interesting building you would like to visit.", category: "Place" },
+                { number: 65, question: "Describe a shop/store you often visit.", category: "Place" },
+                { number: 68, question: "Describe a place you visited and enjoyed in the countryside.", category: "Place" },
+                { number: 70, question: "Describe a place where you saw animals.", category: "Place" },
+                { number: 74, question: "Describe a place with a lot of trees that you would like to visit (e.g. a forest, oasis).", category: "Place" },
+                { number: 82, question: "Describe a noisy place you have been to.", category: "Place" },
+                { number: 98, question: "Describe a place you have been to and would like to recommend others to live there (not your hometown).", category: "Place" },
+                { number: 100, question: "Describe a countryside area that you have been to.", category: "Place" },
+                { number: 108, question: "Describe a quiet place you like to go.", category: "Place" },
+                { number: 117, question: "Describe an important river/lake in your country.", category: "Place" },
+                { number: 120, question: "Describe an ideal and perfect place where you would like to stay (e.g. a house, an apartment).", category: "Place" },
+                { number: 25, question: "Describe a person’s house/apartment that you think is very good.", category: "Place" },
+                { number: 5, question: "Describe a time you saw something interesting on social media.", category: "Events" },
+                { number: 6, question: "Describe a time when you told your friend an important truth.", category: "Events" },
+                { number: 7, question: "Describe the time when you first talked in a foreign language.", category: "Events" },
+                { number: 9, question: "Describe a time when someone apologized to you.", category: "Events" },
+                { number: 10, question: "Describe an occasion when you lost your way.", category: "Events" },
+                { number: 11, question: "Describe a time when you saw something in the sky (e.g. flying kites, birds, sunset, etc.).", category: "Events" },
+                { number: 16, question: "Describe a time when the electricity suddenly went off.", category: "Events" },
+                { number: 18, question: "Describe an important decision made with the help of other people.", category: "Events" },
+                { number: 19, question: "Describe a great dinner you and your friends or family members enjoyed.", category: "Events" },
+                { number: 26, question: "Describe a time when you forgot/missed an appointment.", category: "Events" },
+                { number: 30, question: "Describe a time when you saw a lot of plastic waste (e.g. in a park, on the beach, etc.).", category: "Events" },
+                { number: 32, question: "Describe an argument two of yours friends had.", category: "Events" },
+                { number: 36, question: "Describe your first day at school that you remember.", category: "Events" },
+                { number: 41, question: "Describe a problem you had while shopping online or in a store.", category: "Events" },
+                { number: 42, question: "Describe a difficult thing you did and succeeded in.", category: "Events" },
+                { number: 43, question: "Describe a time when you needed to search for information.", category: "Events" },
+                { number: 44, question: "Describe a time when someone gave you something that you really wanted.", category: "Events" },
+                { number: 49, question: "Describe a time when you made a plan to do an activity with a lot of people.", category: "Events" },
+                { number: 58, question: "Describe a time you saw children behave badly in public.", category: "Events" },
+                { number: 64, question: "Describe a time you made a decision to wait for something.", category: "Events" },
+                { number: 71, question: "Describe an unforgettable experience that you had.", category: "Events" },
+                { number: 81, question: "Describe a time you enjoyed a free day off work or school.", category: "Events" },
+                { number: 83, question: "Describe a disagreement you had with someone.", category: "Events" },
+                { number: 90, question: "Describe a time you made a promise to someone.", category: "Events" },
+                { number: 93, question: "Describe a time when you helped a child.", category: "Events" },
+                { number: 99, question: "Describe a time that something changed your life in good ways.", category: "Events" },
+                { number: 103, question: "Describe a time when someone asked for your opinion.", category: "Events" },
+                { number: 104, question: "Describe a time you used your cellphone/smartphone to do something important.", category: "Events" },
+                { number: 107, question: "Describe a time when you were stuck in a traffic jam.", category: "Events" },
+                { number: 109, question: "Describe something that surprised you and made you happy.", category: "Events" },
+                { number: 115, question: "Describe an interesting discussion you had with your friend.", category: "Events" },
+                { number: 122, question: "Describe a time when missed or were late for an important meeting/event.", category: "Events" },
+                { number: 1, question: "Describe an interesting traditional story.", category: "Things" },
+                { number: 8, question: "Describe a book you read that you found useful.", category: "Things" },
+                { number: 15, question: "Describe a piece of technology you own that you feel is difficult to use.", category: "Things" },
+                { number: 22, question: "Describe a film that made you laugh.", category: "Things" },
+                { number: 39, question: "Describe a story or novel you have read that you found interesting.", category: "Things" },
+                { number: 47, question: "Describe an article on health you read in a magazine or on the Internet.", category: "Things" },
+                { number: 50, question: "Describe a photo you took that you are proud of.", category: "Things" },
+                { number: 51, question: "Describe an object that you think is beautiful.", category: "Things" },
+                { number: 52, question: "Describe something you had to share with others.", category: "Things" },
+                { number: 53, question: "Describe an advertisement which introduced a product you have seen.", category: "Things" },
+                { number: 61, question: "Describe a time when you received money as a gift.", category: "Things" },
+                { number: 69, question: "Describe a photo that you enjoy looking at.", category: "Things" },
+                { number: 72, question: "Describe something you bought that you really wanted to return.", category: "Things" },
+                { number: 73, question: "Describe a kind of foreign food you like and you have had.", category: "Things" },
+                { number: 78, question: "Describe a TV series you like.", category: "Things" },
+                { number: 94, question: "Describe something you received for free.", category: "Things" },
+                { number: 101, question: "Describe an invention that is useful in your daily life.", category: "Things" },
+                { number: 113, question: "Describe a special cake you received from others.", category: "Things" },
+                { number: 114, question: "Describe an interesting song.", category: "Things" },
+                { number: 116, question: "Describe a toy you liked in your childhood.", category: "Things" },
+                { number: 119, question: "Describe a movie you watched recently.", category: "Things" },
+                { number: 91, question: "Describe a line(or a few words) that you remember from a poem or song.", category: "Things" },
+                { number: 3, question: "Describe a talk you gave to a group of people.", category: "Activities" },
+                { number: 4, question: "Describe a good habit your friend has, and you want to develop.", category: "Activities" },
+                { number: 12, question: "Describe a place you went to and an outdoor activity you did there.", category: "Activities" },
+                { number: 17, question: "Describe an exciting activity you have tried for the first time.", category: "Activities" },
+                { number: 21, question: "Describe an outdoor sport you would like to do.", category: "Activities" },
+                { number: 24, question: "Describe a sports event you would like to watch.", category: "Activities" },
+                { number: 35, question: "Describe a sports competition you watched.", category: "Activities" },
+                { number: 38, question: "Describe a program you like to watch.", category: "Activities" },
+                { number: 55, question: "Describe an impressive English lesson you had and enjoyed.", category: "Activities" },
+                { number: 57, question: "Describe a skill that you can teach other people.", category: "Activities" },
+                { number: 66, question: "Describe a goal you set that you tried your best to achieve.", category: "Activities" },
+                { number: 67, question: "Describe an impressive talk/conversation you had that you remember well.", category: "Activities" },
+                { number: 75, question: "Describe a live performance you enjoyed watching.", category: "Activities" },
+                { number: 77, question: "Describe a sport that you really like.", category: "Activities" },
+                { number: 79, question: "Describe a plan that you had to change recently.", category: "Activities" },
+                { number: 80, question: "Describe a water sport you would like to try in the future.", category: "Activities" },
+                { number: 86, question: "Describe an important thing you learned (not at school or college).", category: "Activities" },
+                { number: 87, question: "Describe a foreign country you would like to visit in the future.", category: "Activities" },
+                { number: 88, question: "Describe a rule that is important in your school or at work.", category: "Activities" },
+                { number: 89, question: "Describe an area/subject of science (biology, robotics, etc.) that you are interested in and would like to learn more about.", category: "Activities" },
+                { number: 92, question: "Describe an important decision that you made.", category: "Activities" },
+                { number: 97, question: "Describe a job that is useful to the society.", category: "Activities" },
+                { number: 102, question: "Describe a difficult decision that you made and had a good result.", category: "Activities" },
+                { number: 105, question: "Describe a way/change that helps you save a lot of time.", category: "Activities" },
+                { number: 111, question: "Describe a job that one of your grandparents did.", category: "Activities" },
+                { number: 121, question: "Describe something that you did with someone/a group of people.", category: "Activities" },
+                { number: 58, question: "Describe a time you saw children behave badly in public.", category: "Activities" },
+            ];
+
+            const grid = document.getElementById('questions-grid');
+            const filterButtonsContainer = document.getElementById('filter-buttons');
+            const searchInput = document.getElementById('search-input');
+            const noResults = document.getElementById('no-results');
+            
+            let currentFilter = 'All';
+
+            function renderQuestions() {
+                grid.innerHTML = '';
+                questions.forEach(q => {
+                    const card = document.createElement('div');
+                    card.className = 'question-card p-4 sm:p-6 bg-slate-100 rounded-lg border border-slate-200 transition hover:shadow-lg hover:border-indigo-300';
+                    card.dataset.category = q.category;
+                    card.innerHTML = `<p class="font-semibold text-indigo-600 mb-2">#${q.number}</p><p class="text-slate-800">${q.question}</p>`;
+                    grid.appendChild(card);
+                });
+            }
+
+            function applyFilters() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const questionCards = grid.querySelectorAll('.question-card');
+                let visibleCount = 0;
+
+                questionCards.forEach(card => {
+                    const categoryMatch = currentFilter === 'All' || card.dataset.category === currentFilter;
+                    const searchMatch = card.textContent.toLowerCase().includes(searchTerm);
+
+                    if (categoryMatch && searchMatch) {
+                        card.style.display = 'block';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+
+            filterButtonsContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    currentFilter = e.target.dataset.filter;
+                    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    applyFilters();
+                }
+            });
+
+            searchInput.addEventListener('input', applyFilters);
+
+            function renderChart() {
+                const ctx = document.getElementById('categoryChart').getContext('2d');
+                const counts = questions.reduce((acc, q) => {
+                    acc[q.category] = (acc[q.category] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const labels = Object.keys(counts);
+                const data = Object.values(counts);
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Question Count',
+                            data: data,
+                            backgroundColor: [
+                                'rgba(129, 140, 248, 0.7)',
+                                'rgba(56, 189, 248, 0.7)',
+                                'rgba(251, 146, 60, 0.7)',
+                                'rgba(244, 63, 94, 0.7)',
+                                'rgba(74, 222, 128, 0.7)',
+                            ],
+                            borderColor: [
+                                'rgba(129, 140, 248, 1)',
+                                'rgba(56, 189, 248, 1)',
+                                'rgba(251, 146, 60, 1)',
+                                'rgba(244, 63, 94, 1)',
+                                'rgba(74, 222, 128, 1)',
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + ' questions';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderQuestions();
+            renderChart();
+        });
+    </script>
+</body>
+</html>
